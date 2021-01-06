@@ -1,191 +1,210 @@
-/*
- * GameOfLife.cpp
- *
- *  Created on: Oct 18, 2020
- *      Author: tristan
- */
-
 #include "gameoflife.h"
 
 #include <cassert>
 #include <cstdlib>
-#include <iostream>
+#include <ostream>
+#include <random>
 
 // public:
 
 GameOfLife::GameOfLife(const SizeType width, const SizeType height)
-: _width(width), _height(height)
-{
-	_cellData = std::vector<uint8_t>(getNumberOfCells());
-}
-
-GameOfLife::~GameOfLife()
-{
-	// TODO Auto-generated destructor stub
-}
+:_width{width},
+_height{height},
+_cellData{std::vector<uint8_t>(getNumberOfCells(), 0)}
+{}
 
 GameOfLife::SizeType GameOfLife::getWidth() const
 {
-	return _width;
+    return _width;
 }
 
 GameOfLife::SizeType GameOfLife::getHeight() const
 {
-	return _height;
+    return _height;
 }
 
 GameOfLife::SizeType GameOfLife::getNumberOfCells() const
 {
-	return getWidth()*getHeight();
+    // total number of cells in the grid
+    return getWidth()*getHeight();
 }
 
-bool GameOfLife::isCellAlive(const SizeType i, const SizeType j) const
+bool GameOfLife::isCellAlive(const SizeType x, const SizeType y) const
 {
-	return getCellData(i, j) & statusBit;
+    // only take the dead/alive status contained in the position stateBit
+    return getCellData(x, y) & (1 << stateBit);
 }
 
-void GameOfLife::toggleCellState(const SizeType i, const SizeType j)
+void GameOfLife::toggleCellState(const SizeType x, const SizeType y)
 {
-	toggleCellStatusWithoutUpdate(i, j);
-	updateNeighbours(i, j);
+    toggleCellStatusWithoutUpdate(x, y);
+    updateNeighbours(x, y);
 }
 
 void GameOfLife::applyRandomState()
 {
-	reset();
+    static const time_t seed = time(NULL); // generate static seed
+    static std::default_random_engine generator(seed);
+    static std::uniform_real_distribution<float> distribution(0.0f,1.0f); // uniform distribution for shape and cell state generation
 
-	for (SizeType i = 0; i < getHeight(); ++i)
-		for (SizeType j = 0; j < getWidth(); ++j)
-		{
-			const double randomNumber = rand()/static_cast<double>(RAND_MAX);
-			if (randomNumber < 0.5)
-				toggleCellState(i, j);
-		}
+    reset(); // kill all cells
 
-	return;
-}
+    for (SizeType i = 0; i < getHeight(); ++i)
+    {
+        for (SizeType j = 0; j < getWidth(); ++j)
+        {
+            const float randomNumber = distribution(generator);
+            if (randomNumber < 0.5) // resurrect cells with probability 50%
+                toggleCellState(i, j);
+        }
+    }
 
-void GameOfLife::print() const
-{
-	for (SizeType i = 0; i < getHeight(); ++i)
-	{
-		for (SizeType j = 0; j < getWidth(); ++j)
-			std::cout << isCellAlive(i, j) << " ";
-		std::cout << std::endl;
-	}
-	return;
-}
-
-void GameOfLife::printNeighbours() const
-{
-	for (SizeType i = 0; i < getHeight(); ++i)
-	{
-		for (SizeType j = 0; j < getWidth(); ++j)
-			std::cout << getNumberOfNeighbours(i, j) << " ";
-		std::cout << std::endl;
-	}
-	return;
+    return;
 }
 
 void GameOfLife::reset()
 {
-	for (SizeType i = 0; i < getHeight(); ++i)
-		for (SizeType j = 0; j < getWidth(); ++j)
-			accessCellData(i, j) = 0x00;
-	return;
+    // kill all cells
+    for (SizeType i = 0; i < getHeight(); ++i)
+    {
+        for (SizeType j = 0; j < getWidth(); ++j)
+        {
+            accessCellData(i, j) = 0x00;
+        }
+    }
+
+    return;
 }
 
 void GameOfLife::nextGeneration()
 {
-	std::vector<SizeType> coordinatesToToggle;
-	coordinatesToToggle.reserve(getNumberOfCells()/2);
+    // reserve some space
+    std::vector<SizeType> coordinatesToToggle;
+    coordinatesToToggle.reserve(getNumberOfCells()/2);
 
-	for (SizeType i = 0; i < getHeight(); ++i)
-		for (SizeType j = 0; j < getWidth(); ++j)
-			if (isCellAlive(i, j))
-			{
-				// kill cells
-				if (getNumberOfNeighbours(i, j) != 2 && getNumberOfNeighbours(i,j) != 3)
-				{
-					coordinatesToToggle.push_back(i);
-					coordinatesToToggle.push_back(j);
-				}
-			}
-			else
-			{
-				// resurrect cells
-				if(getNumberOfNeighbours(i, j) == 3)
-				{
-					coordinatesToToggle.push_back(i);
-					coordinatesToToggle.push_back(j);
-				}
-			}
+    // save the coordinates, which are going to be toggled
+    // this is necessary, as toggling the cell state automatically changes the number of neighbours.
+    // so for a right development of the next generation, the current state mustn't be changed
+    // until all cells which are going to be toggled are known
+    for (SizeType i = 0; i < getHeight(); ++i)
+    {
+        for (SizeType j = 0; j < getWidth(); ++j)
+        {
+            if (isCellAlive(i, j))
+            {
+                // cells to be killed
+                if (getNumberOfNeighbours(i, j) != 2 && getNumberOfNeighbours(i,j) != 3)
+                {
+                    coordinatesToToggle.push_back(i);
+                    coordinatesToToggle.push_back(j);
+                }
+            }
+            else
+            {
+                // cells to be resurrected
+                if(getNumberOfNeighbours(i, j) == 3)
+                {
+                    coordinatesToToggle.push_back(i);
+                    coordinatesToToggle.push_back(j);
+                }
+            }
+        }
+    }
 
-	for (SizeType i = 0; i < static_cast<SizeType>(coordinatesToToggle.size()); i += 2)
-	{
-		toggleCellState(coordinatesToToggle[i], coordinatesToToggle[i+1] );
-	}
+    // now, toggle these cells
+    for (SizeType i = 0; i < static_cast<SizeType>(coordinatesToToggle.size()); i += 2)
+    {
+        toggleCellState(coordinatesToToggle[i], coordinatesToToggle[i+1] );
+    }
 
-	return;
+    return;
+}
+
+void GameOfLife::print(std::ostream &outputStream) const
+{
+    for (SizeType i = 0; i < getHeight(); ++i)
+    {
+        for (SizeType j = 0; j < getWidth(); ++j)
+            outputStream << isCellAlive(i, j) << " ";
+        outputStream << std::endl;
+    }
+    return;
+}
+
+void GameOfLife::printNeighbours(std::ostream &outputStream) const
+{
+    for (SizeType i = 0; i < getHeight(); ++i)
+    {
+        for (SizeType j = 0; j < getWidth(); ++j)
+            outputStream << getNumberOfNeighbours(i, j) << " ";
+        outputStream << std::endl;
+    }
+    return;
 }
 
 // private:
 
-uint8_t GameOfLife::getCellData(const SizeType i, const SizeType j) const
+uint8_t GameOfLife::getCellData(const SizeType x, const SizeType y) const
 {
-	return _cellData[i + j*_width];
+    return _cellData[x + y * _width];
 }
 
-uint8_t& GameOfLife::accessCellData(const SizeType i, const SizeType j)
+uint8_t& GameOfLife::accessCellData(const SizeType x, const SizeType y)
 {
-	return _cellData[i + j*_width];
+    return _cellData[x + y * _width];
 }
 
-int GameOfLife::getNumberOfNeighbours(const SizeType i, const SizeType j) const
+int GameOfLife::getNumberOfNeighbours(const SizeType x, const SizeType y) const
 {
-	return getCellData(i, j) >> statusBit;
+    // since the stateBit-th bit is used for the state, we have to shift to the right accordingly
+    return getCellData(x, y) >> (stateBit + 1);
 }
 
-void GameOfLife::setNumberOfNeighbours(const SizeType i, const SizeType j, const int number)
+void GameOfLife::setNumberOfNeighbours(const SizeType x, const SizeType y, const int number)
 {
-	assert(0 <= number && number <= 8 && "ERROR: Tried to set invalid number of neighbours!");
-	// clear number of neighbours
-	accessCellData(i, j) &= statusBit;
-	// set number of neighbours
-	accessCellData(i, j) |= (number << statusBit);
-	return;
+    assert(0 <= number && number <= 8 && "ERROR: Tried to set invalid number of neighbours!");
+    // clear number of neighbours
+    accessCellData(x, y) &= (1 << stateBit);
+    // set number of neighbours
+    accessCellData(x, y) |= (number << (stateBit + 1));
+    return;
 }
 
-void GameOfLife::addToNumberOfNeighbours(const SizeType i, const SizeType j, const int number)
+void GameOfLife::addToNumberOfNeighbours(const SizeType x, const SizeType y, const int number)
 {
-	assert((number == -1 || number == 1) && "ERROR: Invalid number!");
-	if (0 <= i && i < getHeight() && 0 <= j && j < getWidth())
-	{
-		int newNumber = getNumberOfNeighbours(i, j) + number;
-		setNumberOfNeighbours(i, j, newNumber);
-	}
-	return;
+    // for each cell, the number of neighbours can only change by +-1 in each step
+    assert((number == -1 || number == 1) && "ERROR: Invalid number!");
+
+    // when toggling cells on the boundary of the game board, non-existing neighbours outside the boundary could be
+    // toggled. To stop this, only toggle cells which exist.
+    if (0 <= x && x < getHeight() && 0 <= y && y < getWidth())
+    {
+        int newNumber = getNumberOfNeighbours(x, y) + number;
+        setNumberOfNeighbours(x, y, newNumber);
+    }
+    return;
 }
 
-void GameOfLife::updateNeighbours(const SizeType i, const SizeType j)
+void GameOfLife::updateNeighbours(const SizeType x, const SizeType y)
 {
-	int number = 0;
-	if (isCellAlive(i, j))
-		number = 1;
-	else
-		number = -1;
+    int number;
+    if (isCellAlive(x, y))
+        number = 1; // if new cell is alive, all neighbour cells now have a new neighbour
+    else
+        number = -1; // else, they have lost one neighbour
 
-	for (int i_offset = -1; i_offset <= 1; ++i_offset)
-		for (int j_offset = -1; j_offset <= 1; ++j_offset)
-			if (i_offset != 0 || j_offset != 0)
-				addToNumberOfNeighbours(i + i_offset, j + j_offset, number);
+    // add number to each of the neighbour cells
+    for (int i_offset = -1; i_offset <= 1; ++i_offset)
+        for (int j_offset = -1; j_offset <= 1; ++j_offset)
+            if (i_offset != 0 || j_offset != 0) // but do not add it for the cell itself
+                addToNumberOfNeighbours(x + i_offset, y + j_offset, number);
 
-	return;
+    return;
 }
 
-void GameOfLife::toggleCellStatusWithoutUpdate(const SizeType i, const SizeType j)
+void GameOfLife::toggleCellStatusWithoutUpdate(const SizeType x, const SizeType y)
 {
-	accessCellData(i, j) ^= statusBit;
+    accessCellData(x, y) ^= (1 << stateBit);
 }
 
-uint8_t GameOfLife::statusBit = 0x01;
+uint8_t GameOfLife::stateBit = 0; // rightmost bit defines the position for dead/alive state

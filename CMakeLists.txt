@@ -3,7 +3,7 @@ project(conways_game_of_life)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(conways_game_of_life src/main.cpp src/gameoflife.h src/gameoflife.cpp src/renderingengine/renderingengine.h src/renderingengine/renderingengine.cpp)
+add_executable(conways_game_of_life src/main.cpp src/gameoflife.h src/gameoflife.cpp src/renderingengine/renderingengine.h src/renderingengine/renderingengine.cpp src/main_auxiliary.cpp src/main_auxiliary.h)
 
 INCLUDE(FindPkgConfig)
 
