@@ -9,7 +9,7 @@
 #include "gameoflife_test.h"
 
 #include "gameoflife.h"
-#include "renderingengine.h"
+#include "renderingengine/renderingengine.h"
 
 #include <SDL.h>
 

@@ -1,10 +1,3 @@
-/*
- * gameoflife_test.h
- *
- *  Created on: Oct 19, 2020
- *      Author: tristan
- */
-
 #ifndef GAMEOFLIFE_TEST_H_
 #define GAMEOFLIFE_TEST_H_
 
